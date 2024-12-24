@@ -1,7 +1,11 @@
 import 'package:ai_chat_app/chat_services.dart';
+import 'package:ai_chat_app/image_screen.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -12,8 +16,12 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   String result = '';
+  bool isTts = false;
   TextEditingController messageController = TextEditingController();
   ChatServices chatServices = ChatServices();
+  FlutterTts flutterTts = FlutterTts();
+  SpeechToText _speechToText = SpeechToText();
+  bool _speechEnabled = false;
   List<ChatMessage> messages = [];
   List<Map<String, String>> chatData = [
     {"role": "developer", "content": "You are a helpful assistant."},
@@ -42,8 +50,12 @@ class _ChatScreenState extends State<ChatScreen> {
     chatData.add({"role": "user", "content": messageController.text});
     setState(() {
       messageController.text = '';
+      messages;
     });
     result = await chatServices.askChatGPT(chatData);
+    if (isTts) {
+      flutterTts.speak(result);
+    }
     chatData.add({"role": "assistant", "content": result});
     messages.insert(
       0,
@@ -56,6 +68,95 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       result;
     });
+  }
+
+  generateImages() async {
+    if (messageController.text.isEmpty) return;
+    String prompt = messageController.text;
+    messages.insert(
+      0,
+      ChatMessage(
+        text: messageController.text,
+        user: user,
+        createdAt: DateTime.now(),
+      ),
+    );
+    setState(() {
+      messageController.text = '';
+      messages;
+    });
+    // List<String> result = await chatServices.generateImages(prompt);
+    String result = await chatServices.generateImages(prompt);
+    // List<ChatMedia> generatedImages = [];
+    // result.forEach((url) {
+    //   generatedImages.add(
+    //     ChatMedia(
+    //       url: url,
+    //       fileName: 'image',
+    //       type: MediaType.image,
+    //     ),
+    //   );
+    // });
+    messages.insert(
+      0,
+      ChatMessage(
+        user: openAiUser,
+        createdAt: DateTime.now(),
+        // medias: generatedImages,
+        medias: [
+          ChatMedia(
+            url: result,
+            fileName: 'image',
+            type: MediaType.image,
+          ),
+        ],
+      ),
+    );
+    setState(() {
+      result;
+    });
+  }
+
+  ttsSetting() async {
+    flutterTts.setLanguage('en-US');
+    flutterTts.setSpeechRate(0.5);
+    flutterTts.setVolume(1.0);
+    flutterTts.setPitch(1.0);
+  }
+
+  void _initSpeech() async {
+    _speechEnabled = await _speechToText.initialize();
+    setState(() {});
+  }
+
+  void _startListening() async {
+    await _speechToText.listen(onResult: _onSpeechResult);
+    setState(() {});
+  }
+
+  void _stopListening() async {
+    await _speechToText.stop();
+    setState(() {});
+  }
+
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    setState(() {
+      messageController.text = result.recognizedWords;
+    });
+    if (result.finalResult) {
+      if (messageController.text.startsWith('generate image')) {
+        generateImages();
+      } else {
+        askChatGPT();
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    ttsSetting();
+    _initSpeech();
+    super.initState();
   }
 
   @override
@@ -80,6 +181,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
                 readOnly: true,
                 messages: messages,
+                messageOptions: MessageOptions(
+                  onTapMedia: (item) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ImageScreen(url: item.url),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -98,7 +209,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: TextField(
                       controller: messageController,
                       decoration: InputDecoration(
-                        hintText: 'Bạn muốn hỏi gì hôm nay?',
+                        hintText: 'Nhập "generate image" để tạo ảnh',
                         hintStyle: GoogleFonts.quicksand(
                           textStyle: TextStyle(
                             fontSize: 16,
@@ -115,8 +226,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 IconButton(
+                    onPressed: () {
+                      if (_speechEnabled) {
+                        _startListening();
+                      }
+                    },
+                    icon: Icon(
+                      Icons.mic,
+                      color: Colors.black,
+                    )),
+                IconButton(
                   onPressed: () {
-                    askChatGPT();
+                    if (messageController.text.startsWith('generate image')) {
+                      generateImages();
+                    } else {
+                      askChatGPT();
+                    }
+                    flutterTts.stop();
                   },
                   icon: Icon(
                     Icons.send,
@@ -135,17 +261,45 @@ class _ChatScreenState extends State<ChatScreen> {
   AppBar buildAppBar() {
     return AppBar(
       backgroundColor: Colors.black,
+      centerTitle: true,
       title: Text(
         'Chat Screen',
         style: GoogleFonts.roboto(
           textStyle: TextStyle(
             fontSize: 24,
             color: Colors.white,
-            fontWeight: FontWeight.bold,
           ),
         ),
       ),
-      centerTitle: true,
+      leading: IconButton(
+        onPressed: () {
+          setState(() {
+            messages.clear();
+            chatData.clear();
+            flutterTts.stop();
+          });
+        },
+        icon: Icon(Icons.clear, color: Colors.white),
+      ),
+      actions: [
+        IconButton(
+          onPressed: () {
+            flutterTts.stop();
+            if (isTts) {
+              isTts = false;
+            } else {
+              isTts = true;
+            }
+            setState(() {
+              isTts;
+            });
+          },
+          icon: Icon(
+            isTts ? Icons.record_voice_over : Icons.voice_over_off,
+            color: Colors.white,
+          ),
+        ),
+      ],
     );
   }
 }
