@@ -3,7 +3,7 @@ import 'package:http/http.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ChatServices {
-  askChatGPT(List<Map<String, String>> chatData) async {
+  askChatGPT(List<Map<String, Object>> chatData) async {
     String apiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
     final response = await post(
       Uri.parse('https://api.openai.com/v1/chat/completions'),

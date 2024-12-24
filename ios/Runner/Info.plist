@@ -2,10 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Ứng dụng này cần quyền truy cập vào nhận diện giọng nói để cung cấp trải nghiệm tốt hơn.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app requires access to your photo library to allow you to upload and share photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app requires access to your photo library to allow you to upload and share photos.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires access to your camera to take photos and videos directly within the app.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Ứng dụng này cần quyền truy cập vào microphone để ghi âm và tương tác bằng giọng nói.</string>
+	<string>This app requires access to your microphone to enable audio recording for videos and voice messages.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>This app requires access to speech recognition to provide a better experience.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app requires access to your microphone for audio recording and voice interaction.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

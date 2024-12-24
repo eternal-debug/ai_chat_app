@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:ai_chat_app/chat_services.dart';
 import 'package:ai_chat_app/image_screen.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -15,15 +18,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  String result = '';
-  bool isTts = false;
-  TextEditingController messageController = TextEditingController();
-  ChatServices chatServices = ChatServices();
-  FlutterTts flutterTts = FlutterTts();
-  SpeechToText _speechToText = SpeechToText();
-  bool _speechEnabled = false;
-  List<ChatMessage> messages = [];
-  List<Map<String, String>> chatData = [
+  List<Map<String, Object>> chatData = [
     {"role": "developer", "content": "You are a helpful assistant."},
   ];
   ChatUser user = ChatUser(
@@ -37,17 +32,61 @@ class _ChatScreenState extends State<ChatScreen> {
     lastName: 'Assistant',
   );
 
+  String result = '';
+  bool isTts = false;
+  TextEditingController messageController = TextEditingController();
+  ChatServices chatServices = ChatServices();
+  FlutterTts flutterTts = FlutterTts();
+  List<ChatMessage> messages = [];
+
+  convertImageToBase64() async {
+    if (selectedImage != null) {
+      final imageBytes = await selectedImage!.readAsBytes();
+      return base64Encode(imageBytes);
+    }
+  }
+
   askChatGPT() async {
     if (messageController.text.isEmpty) return;
-    messages.insert(
-      0,
-      ChatMessage(
-        text: messageController.text,
-        user: user,
-        createdAt: DateTime.now(),
-      ),
-    );
-    chatData.add({"role": "user", "content": messageController.text});
+    if (isImageSelected) {
+      isImageSelected = false;
+      messages.insert(
+        0,
+        ChatMessage(
+          text: messageController.text,
+          user: user,
+          medias: [
+            ChatMedia(
+              url: selectedImage!.path,
+              fileName: 'image',
+              type: MediaType.image,
+            ),
+          ],
+          createdAt: DateTime.now(),
+        ),
+      );
+      String imageBase64 = await convertImageToBase64();
+      chatData.add({
+        "role": "user",
+        "content": [
+          {
+            "type": "image_url",
+            "image_url": {"url": "data:image/png;base64,$imageBase64"}
+          },
+        ]
+      });
+      chatData.add({"role": "user", "content": messageController.text});
+    } else {
+      messages.insert(
+        0,
+        ChatMessage(
+          text: messageController.text,
+          user: user,
+          createdAt: DateTime.now(),
+        ),
+      );
+      chatData.add({"role": "user", "content": messageController.text});
+    }
     setState(() {
       messageController.text = '';
       messages;
@@ -124,6 +163,8 @@ class _ChatScreenState extends State<ChatScreen> {
     flutterTts.setPitch(1.0);
   }
 
+  final SpeechToText _speechToText = SpeechToText();
+  bool _speechEnabled = false;
   void _initSpeech() async {
     _speechEnabled = await _speechToText.initialize();
     setState(() {});
@@ -149,6 +190,25 @@ class _ChatScreenState extends State<ChatScreen> {
       } else {
         askChatGPT();
       }
+    }
+  }
+
+  final ImagePicker picker = ImagePicker();
+  bool isImageSelected = false;
+  XFile? selectedImage;
+  chooseImage() async {
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      isImageSelected = true;
+      selectedImage = image;
+    }
+  }
+
+  captureImage() async {
+    final XFile? image = await picker.pickImage(source: ImageSource.camera);
+    if (image != null) {
+      isImageSelected = true;
+      selectedImage = image;
     }
   }
 
@@ -203,6 +263,15 @@ class _ChatScreenState extends State<ChatScreen> {
             elevation: 8,
             child: Row(
               children: [
+                IconButton(
+                  onPressed: () {
+                    chooseImage();
+                  },
+                  icon: Icon(
+                    Icons.attach_file_rounded,
+                    color: Colors.black,
+                  ),
+                ),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(left: 8.0),
@@ -226,15 +295,16 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 IconButton(
-                    onPressed: () {
-                      if (_speechEnabled) {
-                        _startListening();
-                      }
-                    },
-                    icon: Icon(
-                      Icons.mic,
-                      color: Colors.black,
-                    )),
+                  onPressed: () {
+                    if (_speechEnabled) {
+                      _startListening();
+                    }
+                  },
+                  icon: Icon(
+                    Icons.mic,
+                    color: Colors.black,
+                  ),
+                ),
                 IconButton(
                   onPressed: () {
                     if (messageController.text.startsWith('generate image')) {
@@ -282,6 +352,12 @@ class _ChatScreenState extends State<ChatScreen> {
         icon: Icon(Icons.clear, color: Colors.white),
       ),
       actions: [
+        IconButton(
+          onPressed: () {
+            captureImage();
+          },
+          icon: Icon(Icons.camera_alt, color: Colors.white),
+        ),
         IconButton(
           onPressed: () {
             flutterTts.stop();
